@@ -10,6 +10,7 @@ import android.content.Intent
 import android.media.RingtoneManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
+import androidx.core.app.TaskStackBuilder
 import com.dicoding.courseschedule.R
 import com.dicoding.courseschedule.data.Course
 import com.dicoding.courseschedule.data.DataRepository
@@ -72,6 +73,22 @@ class DailyReminder : BroadcastReceiver() {
         }
     }
 
+    private fun getPendingIntent(context: Context): PendingIntent? {
+        val intent = Intent(context, HomeActivity::class.java)
+
+        return TaskStackBuilder.create(context).run {
+            addNextIntent(intent)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                getPendingIntent(
+                    NOTIFICATION_ID,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            } else {
+                getPendingIntent(NOTIFICATION_ID, PendingIntent.FLAG_UPDATE_CURRENT)
+            }
+        }
+    }
+
     private fun showNotification(context: Context, content: List<Course>) {
         //TODO 13 : Show today schedules in inbox style notification & open HomeActivity when notification tapped
         val notificationStyle = NotificationCompat.InboxStyle()
@@ -80,14 +97,6 @@ class DailyReminder : BroadcastReceiver() {
             val courseData = String.format(timeString, it.startTime, it.endTime, it.courseName)
             notificationStyle.addLine(courseData)
         }
-
-        val intent = Intent(context, HomeActivity::class.java)
-        val pendingIntent = PendingIntent.getActivity(
-            context,
-            0,
-            intent,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
-        )
 
         val notificationManagerCompat =
             context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -98,27 +107,25 @@ class DailyReminder : BroadcastReceiver() {
             .setContentTitle(context.resources.getString(R.string.today_schedule))
             .setVibrate(longArrayOf(1000, 1000, 1000, 1000, 1000))
             .setSound(alarmSound)
-            .setContentIntent(pendingIntent)
+            .setContentIntent(getPendingIntent(context))
             .setStyle(notificationStyle)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-
             val channel = NotificationChannel(
                 NOTIFICATION_CHANNEL_ID,
                 NOTIFICATION_CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_DEFAULT
+                NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 enableVibration(true)
                 vibrationPattern = longArrayOf(1000, 1000, 1000, 1000, 1000)
             }
             builder.setChannelId(NOTIFICATION_CHANNEL_ID)
-
             notificationManagerCompat.createNotificationChannel(channel)
         }
 
         val notification = builder.build()
-
         notificationManagerCompat.notify(NOTIFICATION_ID, notification)
     }
 }
